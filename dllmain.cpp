@@ -141,17 +141,56 @@ void __fastcall OnResize_hook(UIObject* ptr, int h, int w) {
     OnResize(ptr, h, w);
 }
 
-void InstallPatches() {
+struct Offsets {
+    DWORD64 SetFixedAspectRatioAddr;
+    DWORD64 OnResizeAddr;
+};
+
+void InstallPatches(Offsets offsets) {
     HMODULE EoCApp = GetModuleHandle(NULL);
 
     // Disable 16:9 aspect ratio for Steam Deck resolution
-    DWORD64 SetFixedAspectRatioAddr = (DWORD64)EoCApp + 0x1DAFA60;
+    DWORD64 SetFixedAspectRatioAddr = (DWORD64)EoCApp + offsets.SetFixedAspectRatioAddr;
     SetFixedAspectRatio = (SetFixedAspectRatio_t)DetourFunction64((void*)SetFixedAspectRatioAddr, SetFixedAspectRatio_hook, 18);
 
     // Revert some UI elements to 16:9
-    DWORD64 OnResizeAddr = (DWORD64)EoCApp + 0x1245B20;
+    DWORD64 OnResizeAddr = (DWORD64)EoCApp + offsets.OnResizeAddr;
     OnResize = (OnResize_t)DetourFunction64((void*)OnResizeAddr, OnResize_hook, 17);
 }
+
+// Search for GOG Galaxy in the import table
+bool IsGOG() {
+    HMODULE EoCApp = GetModuleHandle(NULL);
+    IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)EoCApp;
+    IMAGE_NT_HEADERS* imageNTHeaders = (IMAGE_NT_HEADERS*)((DWORD_PTR)EoCApp + dosHeader->e_lfanew);
+    DWORD importDirectoryRVA = imageNTHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+
+    IMAGE_SECTION_HEADER* sectionHeader = IMAGE_FIRST_SECTION(imageNTHeaders);
+    IMAGE_SECTION_HEADER* importSection = NULL;
+    for (int i = 0; i < imageNTHeaders->FileHeader.NumberOfSections; i++) {
+        if (importDirectoryRVA >= sectionHeader->VirtualAddress && (importDirectoryRVA < (sectionHeader->VirtualAddress + sectionHeader->SizeOfRawData))) {
+            importSection = sectionHeader;
+            break;
+        }
+        sectionHeader++;
+    }
+    NULL_CHECK(importSection, "GOG/Steam check failed");
+
+    DWORD_PTR RVA = ((DWORD_PTR)(dosHeader)) + importSection->VirtualAddress;
+    IMAGE_IMPORT_DESCRIPTOR* importDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)(RVA + (imageNTHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress - importSection->VirtualAddress));
+
+    while (importDescriptor->Name != NULL) {
+        if (0 == strcmp((LPCSTR)(RVA + importDescriptor->Name - importSection->VirtualAddress), "Galaxy64.dll")) {
+            return true;
+        }
+        importDescriptor++;
+    }
+
+    return false;
+}
+
+Offsets offsets_steam = { 0x01DAFA60, 0x01245B20 };
+Offsets offsets_gog   = { 0x01D61A10, 0x011F7BB0 };
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     switch (ul_reason_for_call) {
@@ -162,7 +201,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
                 MessageBoxA(NULL, "Version mismatch, check for updates!", LOG_TAG, MB_OK);
             }
             else {
-                InstallPatches();
+                if (IsGOG()) {
+                    InstallPatches(offsets_gog);
+                }
+                else {
+                    InstallPatches(offsets_steam);
+                }
             }
         }
         break;
