@@ -102,11 +102,16 @@ typedef struct _RenderFrame_s {
     uint32_t w;
 } RenderFrame;
 
+bool atTargetResolution = false;
+
 void __fastcall SetFixedAspectRatio_hook(RenderFrame* ptr, bool setFixed, float targetAspect) {
-    if ((ptr->h == 1280) && (ptr->w == 800)) {
-        setFixed = false;
+    atTargetResolution = ((ptr->h == 1280) && (ptr->w == 800));
+    if (atTargetResolution) {
+        SetFixedAspectRatio(ptr, false, targetAspect);
     }
-    SetFixedAspectRatio(ptr, setFixed, targetAspect);
+    else {
+        SetFixedAspectRatio(ptr, setFixed, targetAspect);
+    }
 }
 
 struct UIObject {
@@ -124,19 +129,20 @@ const std::set<std::string> UIObjects {
 };
 
 void __fastcall OnResize_hook(UIObject* ptr, int h, int w) {
+    if (atTargetResolution) {
+        std::filesystem::path path(ptr->path);
+        std::string currentObject = path.stem().generic_string();
 
-    std::filesystem::path path(ptr->path);
-    std::string currentObject = path.stem().generic_string();
+        bool found = UIObjects.find(currentObject) != UIObjects.end();
 
-    bool found = UIObjects.find(currentObject) != UIObjects.end();
+        if (found) {
+            w = 720;
+        }
 
-    if (found) {
-        w = 720;
-    }
-    
-    // edge case: split screen
-    if ((h == 640) && (currentObject == "bottomBar_c")) {
-        w = 720;
+        // edge case: split screen
+        if ((h == 640) && (currentObject == "bottomBar_c")) {
+            w = 720;
+        }
     }
 
     OnResize(ptr, h, w);
