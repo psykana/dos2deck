@@ -1,12 +1,15 @@
 
-# Divinity Original Sin 2 16:10 patch for Steam Deck
+# Divinity: Original Sin 2 16:10 patch for Steam Deck
 
-This patch removes DOS2:DE letterboxing (black bars) on Steam Deck native resolution.
-Supported game version: 3.6.117.3735 (latest on Steam as of 11/10/2023), verified on SteamOS 3.4.11.
+This patch removes letterboxing (black bars) on Steam Deck native resolution without stretching.
+
+Supported game version: 3.6.117.3735 (latest as of 1/6/2024) Steam/GOG, verified on SteamOS 3.5.19.
+
+![screenshot](screenshot.jpg)
 
 **Installation:**
 - [Download](https://github.com/psykana/dos2deck/releases/latest) latest release
-- [Transfer](https://www.youtube.com/watch?v=VfsSCMiZVf4) d3d11.dll to `/home/deck/.local/share/Steam/steamapps/common/Divinity Original Sin 2/DefEd/bin`
+- [Transfer](https://www.youtube.com/watch?v=VfsSCMiZVf4) d3d11.dll to `.../Divinity Original Sin 2/DefEd/bin`
 - Launch the game, set resolution to 1280x800
 
 **Known issues:**
@@ -18,5 +21,4 @@ Reach out on [Larian Studios discord](https://discord.com/invite/larianstudios) 
 **Credits:**
 * [Larian Studios](http://larian.com/), for [Divinity: Original Sin 2](http://store.steampowered.com/app/435150/Divinity_Original_Sin_2/)
 * [Valve](https://www.valvesoftware.com/en/) for Steam Deck and Proton
-* [Guided Hacking](https://guidedhacking.com) for memory hacking and reverse engineering guides.
-* Norbyte, Pip and others at `#dos-modding` for info on game's engine inner works.
+* Norbyte, Pip and others at `#dos-modding` for info on game's engine inner workings.
