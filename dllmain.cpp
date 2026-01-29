@@ -88,23 +88,29 @@ std::string GetGameVersion() {
     return version;
 }
 
-using OnResize_t = void (__fastcall*)(void*, int, int);
+using OnResize_t = void(__fastcall*)(void*, int, int);
 OnResize_t OnResize;
 
-using SetFixedAspectRatio_t = void (__fastcall*)(void*, int, float);
+using SetFixedAspectRatio_t = void(__fastcall*)(void*, int, float);
 SetFixedAspectRatio_t SetFixedAspectRatio;
 
 struct RenderFrame {
     BYTE unk[24];
-    uint32_t h;
     uint32_t w;
+    uint32_t h;
 };
 
-bool atTargetResolution = false;
+bool is16by10 = false;
+uint32_t viewportWidth = 0;
+uint32_t scaledHeight = 0;
 
 void __fastcall SetFixedAspectRatio_hook(RenderFrame* ptr, bool setFixed, float targetAspect) {
-    atTargetResolution = ((ptr->h == 1280) && (ptr->w == 800));
-    if (atTargetResolution) {
+    viewportWidth = ptr->w;
+    scaledHeight = (viewportWidth * 9) / 16;
+
+    is16by10 = ptr->w * 10 == ptr->h * 16;
+
+    if (is16by10) {
         SetFixedAspectRatio(ptr, false, targetAspect);
     }
     else {
@@ -121,24 +127,25 @@ struct UIObject {
 const std::set<std::string> UIObjects {
     "inventorySkillPanel_c",
     "journal_csp",
-    "partyInventory_c"
+    "partyInventory_c",
+    "mainMenu_c"
 };
 
-void __fastcall OnResize_hook(UIObject* ptr, int h, int w) {
-    if (atTargetResolution) {
+void __fastcall OnResize_hook(UIObject* ptr, int w, int h) {
+    if (is16by10) {
         std::filesystem::path path(ptr->path);
         std::string currentObject = path.stem().generic_string();
         bool found = UIObjects.find(currentObject) != UIObjects.end();
         if (found) {
-            w = 720;
+            h = scaledHeight;
         }
         // edge case: split screen
-        if ((h == 640) && (currentObject == "bottomBar_c")) {
-            w = 720;
+        if ((w * 2 == viewportWidth) && (currentObject == "bottomBar_c")) {
+            h = scaledHeight;
         }
     }
 
-    OnResize(ptr, h, w);
+    OnResize(ptr, w, h);
 }
 
 struct Offsets {
@@ -149,7 +156,7 @@ struct Offsets {
 void InstallPatches(Offsets offsets) {
     HMODULE EoCApp = GetModuleHandle(NULL);
 
-    // Disable 16:9 aspect ratio for Steam Deck resolution
+    // Disable fixed 16:9 aspect ratio on 16:10 resolutions
     DWORD64 SetFixedAspectRatioAddr = (DWORD64)EoCApp + offsets.SetFixedAspectRatioAddr;
     SetFixedAspectRatio = (SetFixedAspectRatio_t)DetourFunction64((void*)SetFixedAspectRatioAddr, SetFixedAspectRatio_hook, 18);
 
